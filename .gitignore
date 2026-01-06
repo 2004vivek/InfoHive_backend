@@ -3,8 +3,6 @@ package-lock.json
 node_modules/*
 .idea/*
 .env
-qd-speech-api-user.json
-*.json
 
 
 
