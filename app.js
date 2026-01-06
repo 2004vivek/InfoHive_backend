@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const storage = new Storage({
-    keyFilename: path.join(__dirname, `${process.env.GOOGLE_APPLICATION_CREDENTIALS}`),
+   keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     projectId: `${process.env.GOOGLE_PROJECT_ID}`,
 });
 
