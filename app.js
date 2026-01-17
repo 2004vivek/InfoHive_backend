@@ -580,12 +580,12 @@ app.post('/send-otp', async (req, res) => {
         const msg = {
             to: email,
             from: process.env.EMAIL_USER, // must be a verified sender in SendGrid
-            subject: '🔐 Your OTP Code from QuickDocs App',
-            text: `Your QuickDocs OTP is ${otp}. This OTP is valid for 5 minutes.`,
+            subject: '🔐 Your OTP Code from InfoHive App',
+            text: `Your InfoHive OTP is ${otp}. This OTP is valid for 5 minutes.`,
             html: `
             <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e2e2; border-radius: 10px; padding: 30px 40px; background-color: #fdfdfd;">
                 <div style="text-align: center; margin-bottom: 25px;">
-                    <h2 style="margin: 0; color: #2e6ddf;">QuickDocs Verification</h2>
+                    <h2 style="margin: 0; color: #2e6ddf;">InfoHive Verification</h2>
                     <p style="font-size: 15px; color: #555;">One-Time Password (OTP)</p>
                 </div>
                 <div style="text-align: center; margin: 40px 0;">
@@ -606,13 +606,13 @@ app.post('/send-otp', async (req, res) => {
                     </p>
                     <p style="font-size: 13px; color: #999;">
                         Need help? Contact us at
-                        <a href="mailto:quickdocss@gmail.com" style="color: #2e6ddf;">
-                            quickdocss@gmail.com
+                        <a href="mailto:infohive@gmail.com" style="color: #2e6ddf;">
+                            infohive@gmail.com
                         </a>
                     </p>
                 </div>
                 <div style="text-align: center; font-size: 12px; color: #bbb; margin-top: 30px;">
-                    <p>© ${new Date().getFullYear()} QuickDocs Inc. All rights reserved.</p>
+                    <p>© ${new Date().getFullYear()} InfoHive Inc. All rights reserved.</p>
                 </div>
             </div>
             `
@@ -2066,7 +2066,7 @@ app.get('/', (req, res) => {
     res.send(`
       <html>
         <head>
-          <title>QuickDocs Backend</title>
+          <title>InfoHive Backend</title>
           <style>
             body {
               background: #f5f7fa;
@@ -2101,7 +2101,7 @@ app.get('/', (req, res) => {
         <body>
           <div class="container">
             <div class="emoji">🔐</div>
-            <h1>QuickDocs Backend Server</h1>
+            <h1>InfoHive Backend Server</h1>
             <p>✅ Backend is Running Smoothly</p>
           </div>
         </body>
