@@ -551,7 +551,7 @@ app.post('/signup', async (req, res) => {
             dob: dob,
             gender: encrypt(gender),
             verified: true,
-            profileImageUrl: encrypt(profileImageUrl),
+            profileImageUrl: profileImageUrl ? encrypt(profileImageUrl) : null,
             expoNotificationToken: encrypt(expoNotificationToken)
         });
 
