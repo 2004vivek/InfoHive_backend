@@ -721,10 +721,11 @@ app.post('/update-notification-token', async (req, res) => {
 //Embeddings Conversion
 async function generateEmbedding(text) {
     const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=${process.env.GOOGLE_CLOUD_API}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${process.env.GOOGLE_CLOUD_API}`,
         {
-            content: { parts: [{ text }] },
-            taskType: 'RETRIEVAL_QUERY'
+            content: {
+                parts: [{ text }]
+            }
         },
         {
             headers: { 'Content-Type': 'application/json' }
