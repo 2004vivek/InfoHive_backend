@@ -778,6 +778,8 @@ app.post('/ask', async (req, res) => {
             // Fetch encrypted embeddings from DB (assume embeddings stored encrypted)
             // decrypt embeddings before using
             const queryEmbedding = await generateEmbedding(question);
+            console.log(`Query Embedding Length: ${queryEmbedding.length}`);
+            console.log(`Hashed Username for Search: ${hashedUsername}`);
 
             const results = await FileData.aggregate([
                 {
@@ -792,7 +794,7 @@ app.post('/ask', async (req, res) => {
                 { $match: { usernameHash: hashedUsername } }
             ]);
 
-            console.log(results)
+            console.log("Vector Search Results:", JSON.stringify(results, null, 2));
 
             // decrypt extractedText if stored encrypted
             topMatches = results
@@ -1975,6 +1977,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         const hashedUsername = hashValues(username);
+        console.log(`[Upload] Username: ${username}, Hash: ${hashedUsername}`);
         const modifiedOriginalName = originalname.replace(/\s+/g, '_')
         const fileName = Date.now() + '-' + modifiedOriginalName;
         const gcsKey = `${username}/${fileName}`;
@@ -2033,7 +2036,10 @@ app.post('/upload', upload.single('file'), async (req, res) => {
                 }
 
                 const combinedText = `${originalname}\n${extractedText}`;
+                console.log(`[Upload] Combined Text Length: ${combinedText.length}`);
+
                 const embedding = await generateEmbedding(combinedText);
+                console.log(`[Upload] Generated Embedding Length: ${embedding.length}`);
 
                 const newFile = {
                     name: encrypt(originalname),
