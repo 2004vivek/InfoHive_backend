@@ -785,7 +785,7 @@ app.post('/ask', async (req, res) => {
             const results = await FileData.aggregate([
                 {
                     $vectorSearch: {
-                        index: 'fileDataIndex',
+                        index: 'default',
                         queryVector: queryEmbedding,
                         path: 'embedding',
                         numCandidates: 500,
