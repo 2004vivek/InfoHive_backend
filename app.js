@@ -748,7 +748,8 @@ app.post('/ask', async (req, res) => {
         // Map detected language code to name for prompt
         const langMap = {
             'en-IN': 'English',
-            'te-IN': 'Telugu'
+            'te-IN': 'Telugu',
+            'hi-IN': 'Hindi'
         };
 
         const targetLang = langMap[detectedLanguage] || 'English';
@@ -818,30 +819,45 @@ ${systemContext}
 
 Question: ${lowerQuestion}`;
 
-        const geminiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key=${process.env.GOOGLE_CLOUD_API}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [{
-                                text: prompt
-                            }]
-                        }
-                    ]
-                })
-            }
-        );
+        const generateContent = async (retryCount = 0) => {
+            try {
+                const geminiRes = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_CLOUD_API}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [
+                                {
+                                    role: 'user',
+                                    parts: [{
+                                        text: prompt
+                                    }]
+                                }
+                            ]
+                        })
+                    }
+                );
 
-        const data = await geminiRes.json();
+                if (geminiRes.status === 503 && retryCount < 3) {
+                    console.log(`Gemini API 503 error. Retrying... (${retryCount + 1}/3)`);
+                    await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount))); // Exponential backoff
+                    return generateContent(retryCount + 1);
+                }
+
+                return await geminiRes.json();
+            } catch (error) {
+                console.error("Error in generateContent:", error);
+                throw error;
+            }
+        };
+
+        const data = await generateContent();
 
         console.log(data)
-        console.log(process.env.GOOGLE_CLOUD_API)
+        // console.log(process.env.GOOGLE_CLOUD_API)
 
-        const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No meaningful response.';
+        const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No meaningful response. Please try again.';
 
         console.log(`Answer in ${targetLang}:`, answer);
 
@@ -1826,33 +1842,35 @@ async function deleteOldProfiles(username) {
 }
 
 
-// File Object-id and Details sending API
+// File Object-id and Details sending API (returns signed download URL so private GCS works)
 app.post('/file-data-thrower', async (req, res) => {
     const { username, itemname } = req.body;
 
     try {
-        // Encrypt username for querying
         const hashedUsername = hashValues(username);
-
-        // Find user by encrypted username
         const user = await User.findOne({ usernameHash: hashedUsername });
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        // Find file by decrypting each file name and matching with itemname from frontend (plain text)
         const file = user.myfiles.find(f => decryptSafe(f.name) === itemname);
         if (!file) {
             return res.status(404).json({ message: 'File not found.' });
         }
 
-        // Decrypt file fields before sending
         const fileId = file._id;
-        const fileUrl = decryptSafe(file.url);
-        const fileType = file.type; // assuming type is not sensitive
-        console.log(file)
+        const fileType = file.type;
+        const gcsFilePath = decryptSafe(file.filepath);
 
-        res.json({ fileId, fileUrl, fileType });
+        // Generate a signed read URL (avoids 403 on private bucket)
+        const gcsFile = bucket.file(gcsFilePath);
+        const [signedUrl] = await gcsFile.getSignedUrl({
+            version: 'v4',
+            action: 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+        });
+
+        res.json({ fileId, fileUrl: signedUrl, fileType });
     } catch (err) {
         console.error('Error in /file-data-thrower:', err);
         res.status(500).json({ message: 'Internal server error.' });
