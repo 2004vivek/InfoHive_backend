@@ -725,7 +725,8 @@ async function generateEmbedding(text) {
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${process.env.GOOGLE_CLOUD_API}`,
             {
                 content: { parts: [{ text }] },
-                taskType: 'RETRIEVAL_QUERY'
+                taskType: 'RETRIEVAL_QUERY',
+                outputDimensionality: 768
             },
             {
                 headers: { 'Content-Type': 'application/json' }
@@ -787,8 +788,8 @@ app.post('/ask', async (req, res) => {
                         index: 'fileDataIndex',
                         queryVector: queryEmbedding,
                         path: 'embedding',
-                        numCandidates: 100,
-                        limit: 3
+                        numCandidates: 500,
+                        limit: 50
                     }
                 },
                 { $match: { usernameHash: hashedUsername } }
