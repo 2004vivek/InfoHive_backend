@@ -720,18 +720,23 @@ app.post('/update-notification-token', async (req, res) => {
 
 //Embeddings Conversion
 async function generateEmbedding(text) {
-    const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${process.env.GOOGLE_CLOUD_API}`,
-        {
-            content: { parts: [{ text }] },
-            taskType: 'RETRIEVAL_QUERY'
-        },
-        {
-            headers: { 'Content-Type': 'application/json' }
-        }
-    );
+    try {
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${process.env.GOOGLE_CLOUD_API}`,
+            {
+                content: { parts: [{ text }] },
+                taskType: 'RETRIEVAL_QUERY'
+            },
+            {
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
 
-    return response.data?.embedding?.values || [];
+        return response.data?.embedding?.values || [];
+    } catch (error) {
+        console.error("Error generating embedding:", error.response?.data || error.message);
+        return [];
+    }
 }
 
 // AI RESPONSE
