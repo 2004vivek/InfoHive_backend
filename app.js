@@ -754,6 +754,7 @@ app.post('/ask', async (req, res) => {
         // Map detected language code to name for prompt
         const langMap = {
             'en-IN': 'English',
+            'en-US': 'English',
             'te-IN': 'Telugu',
             'hi-IN': 'Hindi'
         };
@@ -948,6 +949,7 @@ const translateWithGoogleCloud = async (text, sourceLang, targetLang = 'en', pro
         const langMap = {
             'en-IN': 'en',
             'te-IN': 'te',
+            'hi-IN': 'hi',
         };
 
         const mappedSourceLang = langMap[sourceLang] || sourceLang.split('-')[0];
@@ -1014,144 +1016,94 @@ const detectLanguageWithGoogleCloud = async (text, projectId) => {
 // Advanced speech-to-text with Google Cloud Translation
 app.post("/speech-to-text-app", upload.single("audio"), async (req, res) => {
     try {
-        const projectId = process.env.GOOGLE_PROJECT_ID; // Replace with your actual project ID
+        const projectId = process.env.GOOGLE_PROJECT_ID;
         const audioBytes = req.file.buffer.toString("base64");
         const audio = { content: audioBytes };
 
-        console.log("Starting advanced language detection and recognition...");
+        console.log("Starting speech recognition with alternativeLanguageCodes...");
 
-        // Enhanced language list for better coverage
-        const languagesToTest = [
-            'en-IN',    // English (India)
-            'te-IN',    // Telugu (India)
-        ];
-
-        // Enhanced recognition with better configuration
-        const recognitionPromises = languagesToTest.map(async (langCode) => {
-            try {
-                const config = {
-                    encoding: 'AMR',
-                    sampleRateHertz: 8000,
-                    languageCode: langCode,
-                    enableAutomaticPunctuation: true,
-                    enableWordConfidence: true,
-                    enableWordTimeOffsets: true,
-                    model: 'latest_long',
-                    useEnhanced: true, // Use enhanced model for better accuracy
-                    maxAlternatives: 3, // Get multiple alternatives
-                    profanityFilter: false,
-                    enableSpeakerDiarization: false,
-                    metadata: {
-                        interactionType: 'VOICE_SEARCH',
-                        industryNaicsCodeOfAudio: 518210, // Data processing
-                        microphoneDistance: 'NEARFIELD',
-                        originalMediaType: 'AUDIO',
-                        recordingDeviceType: 'SMARTPHONE'
-                    }
-                };
-
-                const [response] = await speechClient.recognize({
-                    audio: audio,
-                    config: config,
-                });
-
-                if (response.results && response.results.length > 0) {
-                    const result = response.results[0];
-                    const alternative = result.alternatives[0];
-
-                    // Calculate enhanced confidence score
-                    const wordConfidences = alternative.words?.map(word => word.confidence) || [];
-                    const avgWordConfidence = wordConfidences.length > 0
-                        ? wordConfidences.reduce((sum, conf) => sum + conf, 0) / wordConfidences.length
-                        : alternative.confidence || 0;
-
-                    return {
-                        language: langCode,
-                        transcript: alternative.transcript,
-                        confidence: alternative.confidence || 0,
-                        avgWordConfidence: avgWordConfidence,
-                        wordCount: alternative.transcript.split(' ').length,
-                        alternatives: result.alternatives.slice(1, 3), // Additional alternatives
-                        words: alternative.words || []
-                    };
-                }
-                return null;
-            } catch (error) {
-                console.log(`Recognition failed for ${langCode}:`, error.message);
-                return null;
+        // Single recognition with alternativeLanguageCodes — Google API auto-detects the language
+        const config = {
+            encoding: 'AMR',
+            sampleRateHertz: 8000,
+            languageCode: 'en-IN',  // Primary language
+            alternativeLanguageCodes: ['te-IN', 'hi-IN'],  // Alternative languages
+            enableAutomaticPunctuation: true,
+            enableWordConfidence: true,
+            enableWordTimeOffsets: true,
+            model: 'latest_long',
+            useEnhanced: true,
+            maxAlternatives: 3,
+            profanityFilter: false,
+            metadata: {
+                interactionType: 'VOICE_SEARCH',
+                industryNaicsCodeOfAudio: 518210,
+                microphoneDistance: 'NEARFIELD',
+                originalMediaType: 'AUDIO',
+                recordingDeviceType: 'SMARTPHONE'
             }
+        };
+
+        const [response] = await speechClient.recognize({
+            audio: audio,
+            config: config,
         });
 
-        // Wait for all recognitions to complete
-        const results = await Promise.all(recognitionPromises);
-        const validResults = results.filter(result => result !== null);
-
-        if (validResults.length === 0) {
+        if (!response.results || response.results.length === 0) {
             return res.status(400).json({
-                error: "No speech detected in any language",
+                error: "No speech detected",
                 transcript: "",
                 detectedLanguage: "unknown",
                 service: "Google Cloud Speech-to-Text"
             });
         }
 
-        // Enhanced scoring algorithm for best result selection
-        const bestResult = validResults.reduce((best, current) => {
-            // Enhanced scoring with multiple factors
-            const currentScore = (
-                current.confidence * 0.4 +
-                current.avgWordConfidence * 0.3 +
-                (current.wordCount > 0 ? 0.2 : 0) +
-                (current.transcript.length > 10 ? 0.1 : 0)
-            );
+        const result = response.results[0];
+        const alternative = result.alternatives[0];
 
-            const bestScore = (
-                best.confidence * 0.4 +
-                best.avgWordConfidence * 0.3 +
-                (best.wordCount > 0 ? 0.2 : 0) +
-                (best.transcript.length > 10 ? 0.1 : 0)
-            );
+        // Google returns the detected language code in result.languageCode
+        const detectedLang = result.languageCode || 'en-IN';
 
-            return currentScore > bestScore ? current : best;
-        });
-
-        console.log(`Best match: ${bestResult.language} with confidence ${bestResult.confidence}`);
-        console.log("Original Text:", bestResult.transcript);
-
-        let finalTranscript = bestResult.transcript;
-        let translationInfo = {
-            originalLanguage: bestResult.language,
-            originalText: bestResult.transcript,
-            wasTranslated: false,
-            confidence: bestResult.confidence,
-            avgWordConfidence: bestResult.avgWordConfidence,
-            service: 'Google Cloud Speech-to-Text',
-            allResults: validResults.map(r => ({
-                language: r.language,
-                transcript: r.transcript,
-                confidence: r.confidence
-            }))
+        // Normalize language code to standard format (e.g., 'en-in' -> 'en-IN')
+        const normalizeLanguageCode = (code) => {
+            const langMap = {
+                'en-in': 'en-IN',
+                'te-in': 'te-IN',
+                'hi-in': 'hi-IN',
+                'en-us': 'en-IN',
+            };
+            return langMap[code.toLowerCase()] || code;
         };
 
-        // Translate using Google Cloud Translation API if needed
-        if (bestResult.language !== 'en-IN' && bestResult.transcript.trim()) {
+        const normalizedLang = normalizeLanguageCode(detectedLang);
+
+        // Calculate word confidence
+        const wordConfidences = alternative.words?.map(word => word.confidence) || [];
+        const avgWordConfidence = wordConfidences.length > 0
+            ? wordConfidences.reduce((sum, conf) => sum + conf, 0) / wordConfidences.length
+            : alternative.confidence || 0;
+
+        console.log(`Detected language: ${normalizedLang} with confidence ${alternative.confidence}`);
+        console.log("Original Text:", alternative.transcript);
+
+        let finalTranscript = alternative.transcript;
+        let translationInfo = {
+            originalLanguage: normalizedLang,
+            originalText: alternative.transcript,
+            wasTranslated: false,
+            confidence: alternative.confidence || 0,
+            avgWordConfidence: avgWordConfidence,
+            service: 'Google Cloud Speech-to-Text',
+        };
+
+        // Translate to English if the detected language is not English
+        if (!normalizedLang.startsWith('en') && alternative.transcript.trim()) {
             try {
                 console.log("Starting Google Cloud Translation...");
 
-                // First, detect language confidence using Translation API
-                const languageDetection = await detectLanguageWithGoogleCloud(
-                    bestResult.transcript,
-                    projectId
-                );
-
-                if (languageDetection) {
-                    console.log(`Language detection: ${languageDetection.languageCode} (confidence: ${languageDetection.confidence})`);
-                }
-
-                // Translate using Google Cloud Translation API
                 const translationResult = await translateWithGoogleCloud(
-                    bestResult.transcript,
-                    bestResult.language,
+                    alternative.transcript,
+                    normalizedLang,
                     'en',
                     projectId
                 );
@@ -1162,37 +1114,28 @@ app.post("/speech-to-text-app", upload.single("audio"), async (req, res) => {
                     translationInfo.translationService = translationResult.service;
                     translationInfo.detectedLanguageByTranslation = translationResult.detectedLanguage;
 
-                    console.log('Translation successful with Google Cloud:', translationResult.translatedText);
+                    console.log('Translation successful:', translationResult.translatedText);
                 } else {
                     console.log('Translation returned empty result');
                 }
 
             } catch (translateError) {
                 console.error("Google Cloud Translation failed:", translateError);
-
-                // Fallback: keep original text but log the failure
                 translationInfo.translationError = translateError.message;
                 translationInfo.translationService = 'Failed - Google Cloud Translation';
             }
         }
 
-        // Enhanced response with more detailed information
         res.json({
             transcript: finalTranscript,
-            detectedLanguage: bestResult.language,
-            confidence: bestResult.confidence,
-            avgWordConfidence: bestResult.avgWordConfidence,
-            wordCount: bestResult.wordCount,
+            detectedLanguage: normalizedLang,
+            confidence: alternative.confidence || 0,
+            avgWordConfidence: avgWordConfidence,
+            wordCount: alternative.transcript.split(' ').length,
             translationInfo: translationInfo,
             success: true,
-            originalText: bestResult.transcript,
+            originalText: alternative.transcript,
             service: 'Google Cloud Speech-to-Text + Translation',
-            processingDetails: {
-                languagesTestedCount: languagesToTest.length,
-                validResultsCount: validResults.length,
-                bestResultScore: bestResult.confidence,
-                hasWordLevelData: bestResult.words.length > 0
-            }
         });
 
     } catch (err) {
